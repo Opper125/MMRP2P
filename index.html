@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Myanmar P2P Trading Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .hide { display: none !important; }
+        .show { display: block !important; }
+        .bg-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .shadow-custom { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .scan-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+        }
+        .scan-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            height: 200px;
+            border: 3px solid #00ff00;
+            border-radius: 10px;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            z-index: 50;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 12px 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .nav-item.active {
+            color: #667eea;
+            background: #f8fafc;
+        }
+        .main-content {
+            padding-bottom: 80px;
+            min-height: calc(100vh - 80px);
+        }
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        .product-card:hover {
+            transform: translateY(-2px);
+        }
+        .kyc-step {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Authentication Screens -->
+    <div id="authScreens" class="hide">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="min-h-screen bg-gradient flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-custom p-8 w-full max-w-md">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Myanmar P2P</h1>
+                    <p class="text-gray-600">အကောင့်ဝင်ရောက်ပါ</p>
+                </div>
+                <form id="loginForm">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Gmail/Username</label>
+                        <input type="text" id="loginIdentifier" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="loginPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">ဝင်ရောက်မည်</button>
+                </form>
+                <p class="text-center mt-4">
+                    <span class="text-gray-600">အကောင့်မရှိသေးဘူးလား? </span>
+                    <button onclick="showSignup()" class="text-blue-600 hover:underline">အကောင့်ဖွင့်မည်</button>
+                </p>
+            </div>
+        </div>
+
+        <!-- Signup Screen -->
+        <div id="signupScreen" class="min-h-screen bg-gradient flex items-center justify-center p-4 hide">
+            <div class="bg-white rounded-2xl shadow-custom p-8 w-full max-w-md">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Myanmar P2P</h1>
+                    <p class="text-gray-600">အကောင့်အသစ်ဖွင့်ပါ</p>
+                </div>
+                <form id="signupForm">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">အမည်</label>
+                        <input type="text" id="signupName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                        <input type="text" id="signupUsername" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Gmail</label>
+                        <input type="email" id="signupEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="signupPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">အကောင့်ဖွင့်မည်</button>
+                </form>
+                <p class="text-center mt-4">
+                    <span class="text-gray-600">အကောင့်ရှိပြီးသားလား? </span>
+                    <button onclick="showLogin()" class="text-blue-600 hover:underline">ဝင်ရောက်မည်</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="mainDashboard" class="hide">
+        <!-- Header -->
+        <header class="bg-white shadow-sm p-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">Myanmar P2P</h1>
+                <div class="flex items-center space-x-4">
+                    <span id="userGreeting" class="text-sm text-gray-600"></span>
+                    <button onclick="logout()" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Home Page -->
+            <div id="homePage" class="p-4">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold mb-4">ရရှိနိုင်သော ကုန်ပစ္စည်းများ</h2>
+                    <div class="flex space-x-2 mb-4">
+                        <button onclick="loadProducts('all')" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">အားလုံး</button>
+                        <button onclick="loadProducts('admin')" class="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm">Admin Products</button>
+                    </div>
+                    <div id="productsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Products will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Page -->
+            <div id="historyPage" class="p-4 hide">
+                <h2 class="text-xl font-semibold mb-4">ဝယ်ယူမှုမှတ်တမ်း</h2>
+                <div id="orderHistory" class="space-y-4">
+                    <!-- Order history will be loaded here -->
+                </div>
+            </div>
+
+            <!-- News Page -->
+            <div id="newsPage" class="p-4 hide">
+                <h2 class="text-xl font-semibold mb-4">သတင်းများ</h2>
+                <div id="newsList" class="space-y-4">
+                    <!-- News will be loaded here -->
+                </div>
+            </div>
+
+            <!-- P2P Page -->
+            <div id="p2pPage" class="p-4 hide">
+                <h2 class="text-xl font-semibold mb-4">ကိုယ်ပိုင်ကုန်ပစ္စည်းများ</h2>
+                <div id="kycWarning" class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 hide">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    ကုန်ပစ္စည်းရောင်းချရန် KYC အတည်ပြုချက်လိုအပ်ပါသည်။
+                </div>
+                <div id="p2pContent" class="hide">
+                    <!-- Payment Methods Section -->
+                    <div class="bg-white rounded-lg p-4 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">ငွေလက်ခံမှုနည်းလမ်းများ</h3>
+                        <button onclick="showAddPaymentMethod()" class="bg-blue-600 text-white px-4 py-2 rounded-lg mb-4">
+                            <i class="fas fa-plus mr-2"></i>Payment Method ထည့်မည်
+                        </button>
+                        <div id="paymentMethodsList">
+                            <!-- Payment methods will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Products Section -->
+                    <div class="bg-white rounded-lg p-4">
+                        <h3 class="text-lg font-semibold mb-4">ကိုယ်ပိုင်ကုန်ပစ္စည်းများ</h3>
+                        <button onclick="showAddProduct()" class="bg-green-600 text-white px-4 py-2 rounded-lg mb-4">
+                            <i class="fas fa-plus mr-2"></i>ကုန်ပစ္စည်းအသစ်ထည့်မည်
+                        </button>
+                        <div id="myProductsList">
+                            <!-- My products will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Page -->
+            <div id="profilePage" class="p-4 hide">
+                <div class="bg-white rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-6">ကိုယ်ရေးအချက်အလက်</h2>
+                    
+                    <!-- Profile Picture Section -->
+                    <div class="text-center mb-6">
+                        <div class="relative inline-block">
+                            <img id="profilePicture" src="https://via.placeholder.com/120" alt="Profile" class="w-30 h-30 rounded-full mx-auto object-cover">
+                            <button onclick="changeProfilePicture()" class="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Profile Form -->
+                    <form id="profileForm" class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">အမည်</label>
+                            <input type="text" id="profileName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                            <input type="text" id="profileUsername" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Gmail</label>
+                            <input type="email" id="profileEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">ဖုန်းနံပါတ်</label>
+                            <input type="tel" id="profilePhone" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                            အချက်အလက်ပြင်မည်
+                        </button>
+                    </form>
+
+                    <!-- KYC Section -->
+                    <div class="mt-8 border-t pt-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">KYC အတည်ပြုချက်</h3>
+                            <span id="kycStatus" class="px-3 py-1 rounded-full text-sm"></span>
+                        </div>
+                        <div id="kycContent">
+                            <!-- KYC content will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- About Page -->
+            <div id="aboutPage" class="p-4 hide">
+                <div class="bg-white rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">ကျွန်ုပ်တို့အကြောင်း</h2>
+                    <p class="text-gray-700 mb-6">Myanmar P2P Trading Platform သည် မြန်မာနိုင်ငံတွင် အရောင်းအဝယ်လုပ်ငန်းကို လုံခြုံစိတ်ချရစွာ လုပ်ဆောင်နိုင်သော ပလပ်ဖောင်းတစ်ခုဖြစ်သည်။</p>
+                    
+                    <h3 class="text-lg font-semibold mb-3">ဆက်သွယ်ရန်</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-facebook text-blue-600"></i>
+                            <a href="#" class="text-blue-600 hover:underline">Facebook</a>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-telegram text-blue-400"></i>
+                            <a href="#" class="text-blue-600 hover:underline">Telegram</a>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-instagram text-pink-500"></i>
+                            <a href="#" class="text-blue-600 hover:underline">Instagram</a>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-twitter text-blue-400"></i>
+                            <a href="#" class="text-blue-600 hover:underline">Twitter</a>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-tiktok text-black"></i>
+                            <a href="#" class="text-blue-600 hover:underline">TikTok</a>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-viber text-purple-600"></i>
+                            <a href="#" class="text-blue-600 hover:underline">Viber</a>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fab fa-weixin text-green-600"></i>
+                            <a href="#" class="text-blue-600 hover:underline">WeChat</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <div class="flex">
+                <div class="nav-item active" onclick="showPage('home')">
+                    <i class="fas fa-home text-lg"></i>
+                    <div class="text-xs mt-1">Home</div>
+                </div>
+                <div class="nav-item" onclick="showPage('history')">
+                    <i class="fas fa-history text-lg"></i>
+                    <div class="text-xs mt-1">History</div>
+                </div>
+                <div class="nav-item" onclick="showPage('news')">
+                    <i class="fas fa-newspaper text-lg"></i>
+                    <div class="text-xs mt-1">News</div>
+                </div>
+                <div class="nav-item" onclick="showPage('p2p')">
+                    <i class="fas fa-store text-lg"></i>
+                    <div class="text-xs mt-1">P2P</div>
+                </div>
+                <div class="nav-item" onclick="showPage('profile')">
+                    <i class="fas fa-user text-lg"></i>
+                    <div class="text-xs mt-1">Profile</div>
+                </div>
+                <div class="nav-item" onclick="showPage('about')">
+                    <i class="fas fa-info-circle text-lg"></i>
+                    <div class="text-xs mt-1">About</div>
+                </div>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Modals -->
+    <!-- KYC Modal -->
+    <div id="kycModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hide">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">KYC အတည်ပြုချက်</h3>
+                <button onclick="closeKycModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="kycModalContent">
+                <!-- KYC steps will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Detail Modal -->
+    <div id="productModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hide">
+        <div class="bg-white rounded-lg w-full max-w-lg mx-4 max-h-screen overflow-y-auto">
+            <div class="p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">ကုန်ပစ္စည်းအသေးစိတ်</h3>
+                    <button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="productModalContent">
+                    <!-- Product details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Product Modal -->
+    <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hide">
+        <div class="bg-white rounded-lg w-full max-w-lg mx-4 max-h-screen overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">ကုန်ပစ္စည်းအသစ်ထည့်မည်</h3>
+                    <button onclick="closeAddProductModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="addProductForm" class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">ကုန်ပစ္စည်းအမည်</label>
+                        <input type="text" id="productName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">အကြောင်းအရာ</label>
+                        <textarea id="productDescription" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 h-20" required></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">စျေးနှုန်း</label>
+                        <input type="number" id="productPrice" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">ပုံများ/ဗီဒီယို</label>
+                        <input type="file" id="productMedia" class="w-full px-3 py-2 border rounded-lg" accept="image/*,video/*" multiple>
+                        <div id="productMediaPreview" class="mt-2 grid grid-cols-2 gap-2"></div>
+                    </div>
+                    
+                    <!-- Social Media Links -->
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">ဆက်သွယ်ရမည့်လမ်းညွှန်</h4>
+                        <div class="space-y-2">
+                            <input type="url" id="facebookLink" placeholder="Facebook Link" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="url" id="telegramLink" placeholder="Telegram Link" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="url" id="instagramLink" placeholder="Instagram Link" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="url" id="twitterLink" placeholder="Twitter Link" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="url" id="tiktokLink" placeholder="TikTok Link" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="url" id="viberLink" placeholder="Viber Link" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="text" id="wechatId" placeholder="WeChat ID" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                        ကုန်ပစ္စည်းထည့်မည်
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Payment Method Modal -->
+    <div id="addPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hide">
+        <div class="bg-white rounded-lg w-full max-w-md mx-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Payment Method ထည့်မည်</h3>
+                    <button onclick="closeAddPaymentModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="addPaymentForm" class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Payment အမည်</label>
+                        <input type="text" id="paymentName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">ဖုန်းနံပါတ်/လိပ်စာ</label>
+                        <input type="text" id="paymentAddress" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">အကြောင်းအရာ</label>
+                        <textarea id="paymentDescription" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 h-20"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Payment Icon</label>
+                        <input type="file" id="paymentIcon" class="w-full px-3 py-2 border rounded-lg" accept="image/*">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">QR Code</label>
+                        <input type="file" id="paymentQr" class="w-full px-3 py-2 border rounded-lg" accept="image/*" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                        Payment Method ထည့်မည်
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Purchase Modal -->
+    <div id="purchaseModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hide">
+        <div class="bg-white rounded-lg w-full max-w-md mx-4 max-h-screen overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">ဝယ်ယူမည်</h3>
+                    <button onclick="closePurchaseModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="purchaseModalContent">
+                    <!-- Purchase content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Face Scan Overlay -->
+    <div id="faceScanOverlay" class="scan-overlay hide">
+        <div class="scan-box">
+            <video id="faceScanVideo" class="w-full h-full object-cover rounded-lg" autoplay muted></video>
+        </div>
+        <div class="absolute top-4 left-4 text-white">
+            <div class="bg-black bg-opacity-50 rounded-lg p-4">
+                <p id="faceScanInstruction" class="mb-2">မျက်နှာကို ကင်မရာရှေ့တွင်ထားပါ</p>
+                <div class="flex items-center">
+                    <div class="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
+                    <span id="faceScanTimer">10</span> စက္ကန့်
+                </div>
+            </div>
+        </div>
+        <button onclick="cancelFaceScan()" class="absolute top-4 right-4 text-white bg-red-600 rounded-full p-2">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://hmucuxappkcynvolxtzx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdWN1eGFwcGtjeW52b2x4dHp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzMDYzMDIsImV4cCI6MjA3MTg4MjMwMn0.zNw6opxfe10_bFIJHTrsZCMuw2xSTb44D_iOFL7W-Lg';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Cloudinary Configuration (You'll need to set this up)
+        const CLOUDINARY_CLOUD_NAME = 'your_cloud_name';
+        const CLOUDINARY_UPLOAD_PRESET = 'your_upload_preset';
+
+        // Global Variables
+        let currentUser = null;
+        let currentProduct = null;
+        let faceScanStream = null;
+        let faceScanTimer = null;
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+        });
+
+        // Authentication Functions
+        async function checkAuthStatus() {
+            const userData = localStorage.getItem('currentUser');
+            if (userData) {
+                currentUser = JSON.parse(userData);
+                showDashboard();
+            } else {
+                showAuth();
+            }
+            hideLoading();
+        }
+
+        function showAuth() {
+            document.getElementById('authScreens').classList.remove('hide');
+            document.getElementById('mainDashboard').classList.add('hide');
+        }
+
+        function showDashboard() {
+            document.getElementById('authScreens').classList.add('hide');
+            document.getElementById('mainDashboard').classList.remove('hide');
+            document.getElementById('userGreeting').textContent = `မင်္ဂလာပါ, ${currentUser.name}`;
+            loadUserProfile();
+            loadProducts('all');
+            checkKycStatus();
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingScreen').classList.add('hide');
+        }
+
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hide');
+            document.getElementById('signupScreen').classList.add('hide');
+        }
+
+        function showSignup() {
+            document.getElementById('loginScreen').classList.add('hide');
+            document.getElementById('signupScreen').classList.remove('hide');
+        }
+
+        // Login Form Handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const identifier = document.getElementById('loginIdentifier').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .or(`email.eq.${identifier},username.eq.${identifier}`)
+                    .eq('password', password)
+                    .single();
+
+                if (error || !data) {
+                    alert('Invalid credentials');
+                    return;
+                }
+
+                if (data.banned_until && new Date(data.banned_until) > new Date()) {
+                    const remainingTime = Math.ceil((new Date(data.banned_until) - new Date()) / (1000 * 60 * 60 * 24));
+                    alert(`သင်၏အကောင့်ကို ပိတ်ပင်ထားပါသည်။ ${remainingTime} ရက် ကျန်ပါသေးသည်။`);
+                    return;
+                }
+
+                if (data.is_banned) {
+                    alert('သင်၏အကောင့်ကို အပြီးအပင် ပိတ်ပင်ထားပါသည်။');
+                    return;
+                }
+
+                currentUser = data;
+                localStorage.setItem('currentUser', JSON.stringify(data));
+                showDashboard();
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed');
+            }
+        });
+
+        // Signup Form Handler
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('signupName').value;
+            const username = document.getElementById('signupUsername').value;
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+
+            try {
+                // Check if username or email already exists
+                const { data: existing } = await supabase
+                    .from('users')
+                    .select('username, email')
+                    .or(`username.eq.${username},email.eq.${email}`);
+
+                if (existing && existing.length > 0) {
+                    alert('Username သို့မဟုတ် Email ရှိပြီးသားဖြစ်ပါသည်');
+                    return;
+                }
+
+                const { data, error } = await supabase
+                    .from('users')
+                    .insert([{
+                        name,
+                        username,
+                        email,
+                        password,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('Signup error:', error);
+                    alert('Registration failed');
+                    return;
+                }
+
+                alert('အကောင့်ဖွင့်ခြင်းအောင်မြင်ပါသည်');
+                showLogin();
+            } catch (error) {
+                console.error('Signup error:', error);
+                alert('Registration failed');
+            }
+        });
+
+        // Navigation Functions
+        function showPage(page) {
+            // Hide all pages
+            const pages = ['home', 'history', 'news', 'p2p', 'profile', 'about'];
+            pages.forEach(p => {
+                document.getElementById(`${p}Page`).classList.add('hide');
+            });
+
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // Show selected page and activate nav item
+            document.getElementById(`${page}Page`).classList.remove('hide');
+            event.target.closest('.nav-item').classList.add('active');
+
+            // Load page specific content
+            switch(page) {
+                case 'home':
+                    loadProducts('all');
+                    break;
+                case 'history':
+                    loadOrderHistory();
+                    break;
+                case 'news':
+                    loadNews();
+                    break;
+                case 'p2p':
+                    loadP2PPage();
+                    break;
+                case 'profile':
+                    loadUserProfile();
+                    break;
+            }
+        }
+
+        // User Profile Functions
+        async function loadUserProfile() {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+
+                if (data) {
+                    document.getElementById('profileName').value = data.name || '';
+                    document.getElementById('profileUsername').value = data.username || '';
+                    document.getElementById('profileEmail').value = data.email || '';
+                    document.getElementById('profilePhone').value = data.phone || '';
+                    
+                    if (data.profile_picture) {
+                        document.getElementById('profilePicture').src = data.profile_picture;
+                    }
+
+                    currentUser = data;
+                    localStorage.setItem('currentUser', JSON.stringify(data));
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        // Profile Form Handler
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const updatedData = {
+                name: document.getElementById('profileName').value,
+                username: document.getElementById('profileUsername').value,
+                email: document.getElementById('profileEmail').value,
+                phone: document.getElementById('profilePhone').value
+            };
+
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .update(updatedData)
+                    .eq('id', currentUser.id)
+                    .select()
+                    .single();
+
+                if (error) {
+                    alert('Update failed');
+                    return;
+                }
+
+                currentUser = { ...currentUser, ...updatedData };
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                alert('Profile updated successfully');
+            } catch (error) {
+                console.error('Profile update error:', error);
+                alert('Update failed');
+            }
+        });
+
+        // KYC Functions
+        async function checkKycStatus() {
+            try {
+                const { data } = await supabase
+                    .from('kyc_verifications')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .single();
+
+                const statusElement = document.getElementById('kycStatus');
+                const kycWarning = document.getElementById('kycWarning');
+                const p2pContent = document.getElementById('p2pContent');
+
+                if (!data) {
+                    statusElement.textContent = 'မတင်ရသေး';
+                    statusElement.className = 'px-3 py-1 rounded-full text-sm bg-gray-200 text-gray-800';
+                    loadKycForm();
+                    kycWarning.classList.remove('hide');
+                    p2pContent.classList.add('hide');
+                } else {
+                    switch(data.status) {
+                        case 'pending':
+                            statusElement.textContent = 'စောင့်ဆိုင်းနေသည်';
+                            statusElement.className = 'px-3 py-1 rounded-full text-sm bg-yellow-200 text-yellow-800';
+                            kycWarning.classList.remove('hide');
+                            p2pContent.classList.add('hide');
+                            break;
+                        case 'approved':
+                            statusElement.textContent = 'အတည်ပြုပြီး';
+                            statusElement.className = 'px-3 py-1 rounded-full text-sm bg-green-200 text-green-800';
+                            kycWarning.classList.add('hide');
+                            p2pContent.classList.remove('hide');
+                            break;
+                        case 'rejected':
+                            statusElement.textContent = 'ငြင်းပယ်ခံရသည်';
+                            statusElement.className = 'px-3 py-1 rounded-full text-sm bg-red-200 text-red-800';
+                            loadKycForm();
+                            kycWarning.classList.remove('hide');
+                            p2pContent.classList.add('hide');
+                            break;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking KYC status:', error);
+            }
+        }
+
+        function loadKycForm() {
+            document.getElementById('kycContent').innerHTML = `
+                <button onclick="startKyc()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                    KYC တင်ရန်
+                </button>
+            `;
+        }
+
+        function startKyc() {
+            document.getElementById('kycModal').classList.remove('hide');
+            loadKycSteps();
+        }
+
+        function loadKycSteps() {
+            document.getElementById('kycModalContent').innerHTML = `
+                <div class="kyc-step">
+                    <h4 class="font-semibold mb-2">အထောက်အထားအမျိုးအစားရွေးချယ်ပါ</h4>
+                    <div class="space-y-2">
+                        <button onclick="selectKycType('nrc')" class="w-full p-3 border rounded-lg hover:bg-gray-50 text-left">
+                            <i class="fas fa-id-card mr-2"></i>NRC
+                        </button>
+                        <button onclick="selectKycType('passport')" class="w-full p-3 border rounded-lg hover:bg-gray-50 text-left">
+                            <i class="fas fa-passport mr-2"></i>Passport
+                        </button>
+                        <button onclick="selectKycType('license')" class="w-full p-3 border rounded-lg hover:bg-gray-50 text-left">
+                            <i class="fas fa-car mr-2"></i>ယာဉ်မောင်းလိုင်စင်
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectKycType(type) {
+            let form = '';
+            
+            if (type === 'nrc') {
+                form = `
+                    <form id="kycForm" class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">NRC အရှေ့ဘက်ပုံ</label>
+                            <input type="file" id="nrcFront" class="w-full px-3 py-2 border rounded-lg" accept="image/*" capture="camera" required>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">NRC အနောက်ဘက်ပုံ</label>
+                            <input type="file" id="nrcBack" class="w-full px-3 py-2 border rounded-lg" accept="image/*" capture="camera" required>
+                        </div>
+                        <div id="extractedInfo" class="space-y-2 hide">
+                            <input type="text" id="nrcNumber" placeholder="NRC နံပါတ်" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="text" id="fullName" placeholder="အမည်အပြည့်အစုံ" class="w-full px-3 py-2 border rounded-lg">
+                            <input type="date" id="dateOfBirth" placeholder="မွေးသက္ကရာဇ်" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        <button type="button" onclick="startFaceScan()" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                            မျက်နှာစကန်ဖတ်မည်
+                        </button>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition hide" id="submitKyc">
+                            KYC တင်မည်
+                        </button>
+                    </form>
+                `;
+            }
+            
+            document.getElementById('kycModalContent').innerHTML = form;
+        }
+
+        function closeKycModal() {
+            document.getElementById('kycModal').classList.add('hide');
+        }
+
+        // Face Scan Functions
+        function startFaceScan() {
+            document.getElementById('faceScanOverlay').classList.remove('hide');
+            
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    faceScanStream = stream;
+                    const video = document.getElementById('faceScanVideo');
+                    video.srcObject = stream;
+                    
+                    // Start countdown
+                    let timeLeft = 10;
+                    document.getElementById('faceScanTimer').textContent = timeLeft;
+                    
+                    faceScanTimer = setInterval(() => {
+                        timeLeft--;
+                        document.getElementById('faceScanTimer').textContent = timeLeft;
+                        
+                        if (timeLeft <= 0) {
+                            completeFaceScan();
+                        }
+                    }, 1000);
+                })
+                .catch(error => {
+                    console.error('Error accessing camera:', error);
+                    alert('ကင်မရာအသုံးပြုခွင့်လိုအပ်ပါသည်');
+                    cancelFaceScan();
+                });
+        }
+
+        function completeFaceScan() {
+            cancelFaceScan();
+            document.getElementById('submitKyc').classList.remove('hide');
+            alert('မျက်နှာစကန်ဖတ်ခြင်းအောင်မြင်ပါသည်');
+        }
+
+        function cancelFaceScan() {
+            document.getElementById('faceScanOverlay').classList.add('hide');
+            
+            if (faceScanStream) {
+                faceScanStream.getTracks().forEach(track => track.stop());
+                faceScanStream = null;
+            }
+            
+            if (faceScanTimer) {
+                clearInterval(faceScanTimer);
+                faceScanTimer = null;
+            }
+        }
+
+        // Product Functions
+        async function loadProducts(type = 'all') {
+            try {
+                let query = supabase
+                    .from('products')
+                    .select(`
+                        *,
+                        users!inner(name, username, profile_picture)
+                    `)
+                    .eq('is_active', true);
+
+                if (type === 'admin') {
+                    query = query.eq('is_admin_product', true);
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('Error loading products:', error);
+                    return;
+                }
+
+                const productsContainer = document.getElementById('productsList');
+                productsContainer.innerHTML = '';
+
+                data.forEach(product => {
+                    const productCard = createProductCard(product);
+                    productsContainer.appendChild(productCard);
+                });
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        function createProductCard(product) {
+            const div = document.createElement('div');
+            div.className = 'product-card cursor-pointer';
+            div.onclick = () => showProductDetail(product);
+
+            const images = product.images ? JSON.parse(product.images) : [];
+            const firstImage = images[0] || 'https://via.placeholder.com/300';
+
+            div.innerHTML = `
+                <img src="${firstImage}" alt="${product.name}" class="w-full h-48 object-cover">
+                <div class="p-4">
+                    <h3 class="font-semibold text-lg mb-2">${product.name}</h3>
+                    <p class="text-2xl font-bold text-green-600 mb-2">${product.price} Ks</p>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <img src="${product.users.profile_picture || 'https://via.placeholder.com/40'}" alt="${product.users.name}" class="w-6 h-6 rounded-full mr-2">
+                        <span>${product.users.name}</span>
+                    </div>
+                    ${product.sold_out ? '<span class="inline-block mt-2 px-2 py-1 bg-red-200 text-red-800 text-xs rounded">Sold Out</span>' : ''}
+                </div>
+            `;
+
+            return div;
+        }
+
+        function showProductDetail(product) {
+            currentProduct = product;
+            document.getElementById('productModal').classList.remove('hide');
+            
+            const images = product.images ? JSON.parse(product.images) : [];
+            const videos = product.videos ? JSON.parse(product.videos) : [];
+            
+            let mediaHtml = '';
+            images.forEach(img => {
+                mediaHtml += `<img src="${img}" class="w-full h-40 object-cover rounded-lg mb-2">`;
+            });
+            videos.forEach(video => {
+                mediaHtml += `<video controls class="w-full h-40 rounded-lg mb-2"><source src="${video}" type="video/mp4"></video>`;
+            });
+
+            document.getElementById('productModalContent').innerHTML = `
+                <div class="space-y-4">
+                    ${mediaHtml}
+                    <h3 class="text-xl font-bold">${product.name}</h3>
+                    <p class="text-3xl font-bold text-green-600">${product.price} Ks</p>
+                    <p class="text-gray-700">${product.description}</p>
+                    
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">ရောင်းသူ</h4>
+                        <div class="flex items-center">
+                            <img src="${product.users.profile_picture || 'https://via.placeholder.com/40'}" alt="${product.users.name}" class="w-10 h-10 rounded-full mr-3">
+                            <div>
+                                <p class="font-medium">${product.users.name}</p>
+                                <p class="text-sm text-gray-600">@${product.users.username}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${product.user_id !== currentUser.id && !product.sold_out ? `
+                        <button onclick="initiatePurchase()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
+                            <i class="fas fa-shopping-cart mr-2"></i>ဝယ်ယူမည်
+                        </button>
+                    ` : ''}
+                    
+                    ${product.user_id === currentUser.id ? '<p class="text-gray-600 text-center">သင်၏ကုန်ပစ္စည်းဖြစ်ပါသည်</p>' : ''}
+                    ${product.sold_out ? '<p class="text-red-600 text-center font-semibold">ရောင်းပြီးဖြစ်ပါသည်</p>' : ''}
+                </div>
+            `;
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.add('hide');
+            currentProduct = null;
+        }
+
+        // P2P Functions
+        async function loadP2PPage() {
+            if (!currentUser) return;
+
+            try {
+                // Load payment methods
+                const { data: paymentMethods } = await supabase
+                    .from('payment_methods')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+
+                const paymentMethodsList = document.getElementById('paymentMethodsList');
+                paymentMethodsList.innerHTML = '';
+
+                if (paymentMethods && paymentMethods.length > 0) {
+                    paymentMethods.forEach(method => {
+                        const methodDiv = document.createElement('div');
+                        methodDiv.className = 'border rounded-lg p-4 mb-2';
+                        methodDiv.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div class="flex items-center">
+                                    ${method.icon_url ? `<img src="${method.icon_url}" class="w-8 h-8 rounded mr-3">` : ''}
+                                    <div>
+                                        <p class="font-semibold">${method.name}</p>
+                                        <p class="text-sm text-gray-600">${method.address}</p>
+                                    </div>
+                                </div>
+                                <button onclick="deletePaymentMethod('${method.id}')" class="text-red-600 hover:text-red-800">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                        paymentMethodsList.appendChild(methodDiv);
+                    });
+                } else {
+                    paymentMethodsList.innerHTML = '<p class="text-gray-600">Payment Method မရှိသေးပါ</p>';
+                }
+
+                // Load my products
+                const { data: myProducts } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+
+                const myProductsList = document.getElementById('myProductsList');
+                myProductsList.innerHTML = '';
+
+                if (myProducts && myProducts.length > 0) {
+                    myProducts.forEach(product => {
+                        const productDiv = document.createElement('div');
+                        productDiv.className = 'border rounded-lg p-4 mb-2';
+                        
+                        const images = product.images ? JSON.parse(product.images) : [];
+                        const firstImage = images[0] || 'https://via.placeholder.com/100';
+
+                        productDiv.innerHTML = `
+                            <div class="flex items-start space-x-4">
+                                <img src="${firstImage}" alt="${product.name}" class="w-16 h-16 object-cover rounded-lg">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold">${product.name}</h4>
+                                    <p class="text-green-600 font-bold">${product.price} Ks</p>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <button onclick="toggleSoldOut('${product.id}', ${!product.sold_out})" class="text-sm px-3 py-1 rounded ${product.sold_out ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}">
+                                            ${product.sold_out ? 'မရောင်းတော့' : 'Sold Out'}
+                                        </button>
+                                        <button onclick="deleteProduct('${product.id}')" class="text-sm px-3 py-1 bg-red-600 text-white rounded">
+                                            <i class="fas fa-trash mr-1"></i>ဖျက်မည်
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        myProductsList.appendChild(productDiv);
+                    });
+                } else {
+                    myProductsList.innerHTML = '<p class="text-gray-600">ကုန်ပစ္စည်းမရှိသေးပါ</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading P2P page:', error);
+            }
+        }
+
+        function showAddPaymentMethod() {
+            document.getElementById('addPaymentModal').classList.remove('hide');
+        }
+
+        function closeAddPaymentModal() {
+            document.getElementById('addPaymentModal').classList.add('hide');
+        }
+
+        function showAddProduct() {
+            document.getElementById('addProductModal').classList.remove('hide');
+        }
+
+        function closeAddProductModal() {
+            document.getElementById('addProductModal').classList.add('hide');
+        }
+
+        // Add Payment Method Handler
+        document.getElementById('addPaymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                user_id: currentUser.id,
+                name: document.getElementById('paymentName').value,
+                address: document.getElementById('paymentAddress').value,
+                description: document.getElementById('paymentDescription').value
+            };
+
+            // Upload icon and QR code to Cloudinary (simplified version)
+            const iconFile = document.getElementById('paymentIcon').files[0];
+            const qrFile = document.getElementById('paymentQr').files[0];
+
+            try {
+                if (iconFile) {
+                    // Upload icon (you'll need to implement Cloudinary upload)
+                    formData.icon_url = 'https://via.placeholder.com/50'; // Replace with actual upload
+                }
+
+                if (qrFile) {
+                    // Upload QR code
+                    formData.qr_code_url = 'https://via.placeholder.com/200'; // Replace with actual upload
+                }
+
+                const { error } = await supabase
+                    .from('payment_methods')
+                    .insert([formData]);
+
+                if (error) {
+                    alert('Failed to add payment method');
+                    return;
+                }
+
+                alert('Payment Method ထည့်ခြင်းအောင်မြင်ပါသည်');
+                closeAddPaymentModal();
+                loadP2PPage();
+            } catch (error) {
+                console.error('Error adding payment method:', error);
+                alert('Failed to add payment method');
+            }
+        });
+
+        // Add Product Handler
+        document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                user_id: currentUser.id,
+                name: document.getElementById('productName').value,
+                description: document.getElementById('productDescription').value,
+                price: parseFloat(document.getElementById('productPrice').value),
+                facebook_link: document.getElementById('facebookLink').value,
+                telegram_link: document.getElementById('telegramLink').value,
+                instagram_link: document.getElementById('instagramLink').value,
+                twitter_link: document.getElementById('twitterLink').value,
+                tiktok_link: document.getElementById('tiktokLink').value,
+                viber_link: document.getElementById('viberLink').value,
+                wechat_id: document.getElementById('wechatId').value
+            };
+
+            // Upload media files (simplified version)
+            const mediaFiles = document.getElementById('productMedia').files;
+            const images = [];
+            const videos = [];
+
+            // In a real implementation, you would upload each file to Cloudinary
+            for (let i = 0; i < mediaFiles.length; i++) {
+                const file = mediaFiles[i];
+                if (file.type.startsWith('image/')) {
+                    images.push('https://via.placeholder.com/300'); // Replace with actual upload
+                } else if (file.type.startsWith('video/')) {
+                    videos.push('https://via.placeholder.com/video'); // Replace with actual upload
+                }
+            }
+
+            formData.images = JSON.stringify(images);
+            formData.videos = JSON.stringify(videos);
+
+            try {
+                const { error } = await supabase
+                    .from('products')
+                    .insert([formData]);
+
+                if (error) {
+                    alert('Failed to add product');
+                    return;
+                }
+
+                alert('ကုန်ပစ္စည်းထည့်ခြင်းအောင်မြင်ပါသည်');
+                closeAddProductModal();
+                loadP2PPage();
+                loadProducts('all');
+            } catch (error) {
+                console.error('Error adding product:', error);
+                alert('Failed to add product');
+            }
+        });
+
+        // Purchase Functions
+        function initiatePurchase() {
+            if (!currentProduct) return;
+            
+            document.getElementById('purchaseModal').classList.remove('hide');
+            loadPurchaseOptions();
+        }
+
+        async function loadPurchaseOptions() {
+            try {
+                const { data: paymentMethods } = await supabase
+                    .from('payment_methods')
+                    .select('*')
+                    .eq('user_id', currentProduct.user_id);
+
+                let content = `
+                    <div class="space-y-4">
+                        <h4 class="font-semibold">Payment Method ရွေးချယ်ပါ</h4>
+                `;
+
+                if (paymentMethods && paymentMethods.length > 0) {
+                    paymentMethods.forEach(method => {
+                        content += `
+                            <div class="border rounded-lg p-4 cursor-pointer hover:bg-gray-50" onclick="selectPaymentMethod('${method.id}')">
+                                <div class="flex items-center">
+                                    ${method.icon_url ? `<img src="${method.icon_url}" class="w-8 h-8 rounded mr-3">` : ''}
+                                    <div>
+                                        <p class="font-semibold">${method.name}</p>
+                                        <p class="text-sm text-gray-600">${method.address}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    content += '<p class="text-gray-600">ရောင်းသူ Payment Method မထည့်ထားပါ</p>';
+                }
+
+                content += '</div>';
+                document.getElementById('purchaseModalContent').innerHTML = content;
+
+            } catch (error) {
+                console.error('Error loading purchase options:', error);
+            }
+        }
+
+        function selectPaymentMethod(methodId) {
+            // Show payment details and proof upload
+            document.getElementById('purchaseModalContent').innerHTML = `
+                <div class="space-y-4">
+                    <h4 class="font-semibold">ငွေပေးချေမှုအထောက်အထား</h4>
+                    <div class="border rounded-lg p-4">
+                        <p class="text-sm text-gray-600 mb-2">ငွေလွှဲပြီးနောက် ပြေစာတင်ပါ</p>
+                        <input type="file" id="paymentProof" class="w-full px-3 py-2 border rounded-lg" accept="image/*" capture="camera" required>
+                    </div>
+                    <button onclick="submitOrder()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
+                        မှာယူမှုအတည်ပြုမည်
+                    </button>
+                </div>
+            `;
+        }
+
+        async function submitOrder() {
+            const proofFile = document.getElementById('paymentProof').files[0];
+            if (!proofFile) {
+                alert('ငွေပေးချေမှုအထောက်အထားတင်ပါ');
+                return;
+            }
+
+            try {
+                // Upload payment proof (simplified)
+                const proofUrl = 'https://via.placeholder.com/400'; // Replace with actual upload
+
+                const { error } = await supabase
+                    .from('orders')
+                    .insert([{
+                        buyer_id: currentUser.id,
+                        seller_id: currentProduct.user_id,
+                        product_id: currentProduct.id,
+                        payment_proof_url: proofUrl,
+                        status: 'pending'
+                    }]);
+
+                if (error) {
+                    alert('မှာယူမှုမအောင်မြင်ပါ');
+                    return;
+                }
+
+                alert('မှာယူမှုအောင်မြင်ပါသည်။ ရောင်းသူ၏အတည်ပြုချက်ကိုစောင့်ပါ');
+                closePurchaseModal();
+                closeProductModal();
+            } catch (error) {
+                console.error('Error submitting order:', error);
+                alert('မှာယူမှုမအောင်မြင်ပါ');
+            }
+        }
+
+        function closePurchaseModal() {
+            document.getElementById('purchaseModal').classList.add('hide');
+        }
+
+        // News Functions
+        async function loadNews() {
+            try {
+                const { data, error } = await supabase
+                    .from('news')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                const newsList = document.getElementById('newsList');
+                newsList.innerHTML = '';
+
+                if (data && data.length > 0) {
+                    data.forEach(news => {
+                        const newsDiv = document.createElement('div');
+                        newsDiv.className = 'bg-white rounded-lg p-4 shadow-sm';
+                        
+                        const images = news.images ? JSON.parse(news.images) : [];
+                        const firstImage = images[0];
+
+                        newsDiv.innerHTML = `
+                            ${firstImage ? `<img src="${firstImage}" class="w-full h-48 object-cover rounded-lg mb-4">` : ''}
+                            <h3 class="text-lg font-semibold mb-2">${news.title}</h3>
+                            <p class="text-gray-700 mb-3">${news.content}</p>
+                            <div class="text-sm text-gray-500">
+                                ${new Date(news.created_at).toLocaleDateString('my-MM')}
+                            </div>
+                        `;
+                        newsList.appendChild(newsDiv);
+                    });
+                } else {
+                    newsList.innerHTML = '<p class="text-gray-600 text-center">သတင်းမရှိသေးပါ</p>';
+                }
+            } catch (error) {
+                console.error('Error loading news:', error);
+            }
+        }
+
+        // Order History Functions
+        async function loadOrderHistory() {
+            try {
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select(`
+                        *,
+                        products(name, price, images),
+                        users!orders_seller_id_fkey(name, username)
+                    `)
+                    .eq('buyer_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+
+                const orderHistory = document.getElementById('orderHistory');
+                orderHistory.innerHTML = '';
+
+                if (data && data.length > 0) {
+                    data.forEach(order => {
+                        const orderDiv = document.createElement('div');
+                        orderDiv.className = 'bg-white rounded-lg p-4 shadow-sm';
+                        
+                        const images = order.products.images ? JSON.parse(order.products.images) : [];
+                        const firstImage = images[0] || 'https://via.placeholder.com/100';
+
+                        let statusClass = '';
+                        let statusText = '';
+                        
+                        switch(order.status) {
+                            case 'pending':
+                                statusClass = 'bg-yellow-200 text-yellow-800';
+                                statusText = 'စောင့်ဆိုင်းနေသည်';
+                                break;
+                            case 'confirmed':
+                                statusClass = 'bg-green-200 text-green-800';
+                                statusText = 'အတည်ပြုပြီး';
+                                break;
+                            case 'cancelled':
+                                statusClass = 'bg-red-200 text-red-800';
+                                statusText = 'ပယ်ဖျက်ပြီး';
+                                break;
+                        }
+
+                        orderDiv.innerHTML = `
+                            <div class="flex items-start space-x-4">
+                                <img src="${firstImage}" alt="${order.products.name}" class="w-16 h-16 object-cover rounded-lg">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold">${order.products.name}</h4>
+                                    <p class="text-green-600 font-bold">${order.products.price} Ks</p>
+                                    <p class="text-sm text-gray-600">ရောင်းသူ: ${order.users.name}</p>
+                                    <span class="inline-block mt-2 px-2 py-1 text-xs rounded ${statusClass}">${statusText}</span>
+                                </div>
+                            </div>
+                        `;
+                        orderHistory.appendChild(orderDiv);
+                    });
+                } else {
+                    orderHistory.innerHTML = '<p class="text-gray-600 text-center">မှာယူမှုမှတ်တမ်းမရှိပါ</p>';
+                }
+            } catch (error) {
+                console.error('Error loading order history:', error);
+            }
+        }
+
+        // Utility Functions
+        async function deletePaymentMethod(id) {
+            if (!confirm('Payment Method ကိုဖျက်မှာသေချာလား?')) return;
+
+            try {
+                const { error } = await supabase
+                    .from('payment_methods')
+                    .delete()
+                    .eq('id', id);
+
+                if (!error) {
+                    loadP2PPage();
+                }
+            } catch (error) {
+                console.error('Error deleting payment method:', error);
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('ကုန်ပစ္စည်းကိုဖျက်မှာသေချာလား?')) return;
+
+            try {
+                const { error } = await supabase
+                    .from('products')
+                    .delete()
+                    .eq('id', id);
+
+                if (!error) {
+                    loadP2PPage();
+                    loadProducts('all');
+                }
+            } catch (error) {
+                console.error('Error deleting product:', error);
+            }
+        }
+
+        async function toggleSoldOut(productId, soldOut) {
+            try {
+                const { error } = await supabase
+                    .from('products')
+                    .update({ sold_out: soldOut })
+                    .eq('id', productId);
+
+                if (!error) {
+                    loadP2PPage();
+                    loadProducts('all');
+                }
+            } catch (error) {
+                console.error('Error updating product status:', error);
+            }
+        }
+
+        function changeProfilePicture() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    // Upload to Cloudinary (simplified)
+                    const imageUrl = 'https://via.placeholder.com/120'; // Replace with actual upload
+                    
+                    try {
+                        const { error } = await supabase
+                            .from('users')
+                            .update({ profile_picture: imageUrl })
+                            .eq('id', currentUser.id);
+
+                        if (!error) {
+                            document.getElementById('profilePicture').src = imageUrl;
+                            currentUser.profile_picture = imageUrl;
+                            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        }
+                    } catch (error) {
+                        console.error('Error updating profile picture:', error);
+                    }
+                }
+            };
+            input.click();
+        }
+
+        function logout() {
+            if (confirm('Logout လုပ်မှာသေချာလား?')) {
+                localStorage.removeItem('currentUser');
+                currentUser = null;
+                showAuth();
+            }
+        }
+
+        // File upload validation
+        document.addEventListener('change', function(e) {
+            if (e.target.type === 'file') {
+                const files = e.target.files;
+                for (let file of files) {
+                    // Check if it's a screenshot (basic check)
+                    if (file.name.toLowerCase().includes('screenshot') || 
+                        file.name.toLowerCase().includes('screen')) {
+                        alert('စကရင်ရှော့ပုံများကို လက်မခံပါ။ ကင်မရာဖြင့်ရိုက်ထားသောပုံသုံးပါ။');
+                        e.target.value = '';
+                        return;
+                    }
+                    
+                    // Check video size (50MB limit)
+                    if (file.type.startsWith('video/') && file.size > 50 * 1024 * 1024) {
+                        alert('ဗီဒီယိုဖိုင်သည် 50MB ထက်မပိုရပါ');
+                        e.target.value = '';
+                        return;
+                    }
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>
